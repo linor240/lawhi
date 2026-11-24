@@ -1,0 +1,16 @@
+{
+  "name": "Lawhi — Coran",
+  "short_name": "Lawhi",
+  "description": "Écouter le Coran, apprendre à lire et écrire l'arabe.",
+  "lang": "fr",
+  "start_url": "./#ecouter",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1716",
+  "theme_color": "#0f1716",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
