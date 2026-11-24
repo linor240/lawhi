@@ -3,7 +3,7 @@
 // vérification 30 s après l'ouverture puis toutes les 6 h, point rouge sur l'engrenage,
 // « Version X · à jour » avec un bouton Vérifier / Installer dans les réglages,
 // et installation automatique quand l'appli n'est pas utilisée (option).
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 const up = { status: "idle", available: null, notes: [], error: "", lastCheck: 0 };
 let swReg = null;
 

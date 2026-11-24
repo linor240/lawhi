@@ -1,10 +1,10 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "date": "2026-11-24",
   "notes": [
-    "Première version de Lawhi.",
-    "Écoute du Coran avec 8 récitateurs, hors-ligne possible.",
-    "Traduction française verset par verset, écrite ou lue.",
-    "Horaires de prière, alphabet, écriture, quiz et histoire de l'islam."
+    "Nouvelle interface, plus sobre et moins chargée.",
+    "Pendant la récitation avec traduction, les versets s'affichent les uns sous les autres, le plus récent en bas.",
+    "Les réglages de la récitation (récitateur, vitesse, minuterie…) se trouvent derrière l'engrenage.",
+    "La lecture de la traduction à voix haute a été retirée."
   ]
 }
