@@ -596,7 +596,7 @@ function applyTheme() {
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   const dark = t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   const tb = $("#themeBtn"); if (tb) tb.innerHTML = dark ? I.sun : I.moon;
-  document.querySelector('meta[name="theme-color"]').content = dark ? "#0f1716" : "#f2f4f2";
+  document.querySelector('meta[name="theme-color"]').content = dark ? "#231e11" : "#f5efd8";
 }
 
 // ---------- Événements ----------
