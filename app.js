@@ -43,8 +43,7 @@ const state = {
   showFr: store.get("showFr", true),
   qsize: store.get("qsize", 30),
   sleepAt: 0,
-  verseMode: store.get("verseMode", false),
-  speakFr: store.get("speakFr", false)
+  verseMode: store.get("verseMode", false)
 };
 const rec = () => RECITERS.find((r) => r.id === state.reciter) || RECITERS[0];
 
@@ -71,6 +70,9 @@ const I = {
   moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>'
 };
 
@@ -122,23 +124,24 @@ function setMeta(title) {
     artwork: [{ src: "icon-512.png", sizes: "512x512", type: "image/png" }]
   });
 }
-// Mode traduction : la sourate est jouée verset par verset, avec l'arabe et le français à l'écran
-// et, en option, la traduction lue à voix haute après chaque verset.
-let speakingFr = false;
+// Mode traduction : la sourate est jouée verset par verset ; les versets s'empilent
+// dans le lecteur, le plus récent en bas, les précédents remontent.
+let feed = []; // versets déjà récités de la sourate en cours : { n, k, ar, fr }
 async function playVerseMode(n, k = 1) {
-  if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
-  speakingFr = false;
   let ayahs;
-  try { ayahs = await getText(n); } catch { toast("Le texte de cette sourate n'est pas disponible sans réseau. Lecture sans traduction."); state.verseMode = false; return playSurah(n); }
+  try { ayahs = await getText(n); } catch { toast("Le texte de cette sourate n'est pas disponible sans réseau. Lecture sans traduction."); state.verseMode = false; store.set("verseMode", false); return playSurah(n); }
   const s = S(n), a = ayahs[k - 1];
+  const changed = !state.current || state.current.n !== n || state.current.k == null;
+  if (changed || k === 1) feed = [];
+  if (!feed.some((v) => v.n === n && v.k === k)) feed.push({ n, k, ar: a.ar, fr: a.fr });
   state.current = { n, reciter: state.reciter, offline: false, k, a };
   audio.src = ayahUrl(rec(), n, k);
   audio.playbackRate = state.rate;
-  try { await audio.play(); } catch { if (!navigator.onLine) toast("L'écoute avec traduction demande du réseau."); }
+  try { await audio.play(); } catch { if (!navigator.onLine) toast("La traduction pendant l'écoute demande du réseau."); }
   setMeta(`${s.n}. ${s.fr} · verset ${k}/${s.ayahs}`);
   store.set("last", { n, reciter: state.reciter, t: 0, k });
   renderMini(); refreshRows(); markVerse(n, k);
-  if (!$("#playerSheet").hidden) renderPlayer();
+  if (!$("#playerSheet").hidden) { if (changed || !$("#feed")) renderPlayer(); else updateFeed(); }
 }
 function markVerse(n, k) {
   if ($("#readerSheet").hidden || readingN !== n) return;
@@ -147,25 +150,14 @@ function markVerse(n, k) {
 }
 function afterVerse() {
   const c = state.current; if (!c || c.k == null) return;
-  const go = () => {
-    if (c.k < S(c.n).ayahs) return playVerseMode(c.n, c.k + 1);
-    if (state.repeat === "une") return playVerseMode(c.n, 1);
-    if (state.repeat === "suite" && c.n < 114) return playVerseMode(c.n + 1, 1);
-    store.set("last", { n: c.n, reciter: c.reciter, t: 0 });
-  };
-  if (state.speakFr && "speechSynthesis" in window && c.a) {
-    speakingFr = true;
-    const u = new SpeechSynthesisUtterance(c.a.fr); u.lang = "fr-FR"; u.rate = 1;
-    const fr = speechSynthesis.getVoices().find((v) => /^fr/i.test(v.lang)); if (fr) u.voice = fr;
-    u.onend = () => { if (speakingFr && state.current === c) { speakingFr = false; go(); } };
-    speechSynthesis.speak(u);
-  } else go();
+  if (c.k < S(c.n).ayahs) return playVerseMode(c.n, c.k + 1);
+  if (state.repeat === "une") return playVerseMode(c.n, 1);
+  if (state.repeat === "suite" && c.n < 114) return playVerseMode(c.n + 1, 1);
+  store.set("last", { n: c.n, reciter: c.reciter, t: 0 });
 }
 
 async function playSurah(n, startAt = 0) {
   if (state.verseMode) return playVerseMode(n, 1);
-  if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
-  speakingFr = false;
   const s = S(n);
   const { src, offline } = await sourceFor(n);
   state.current = { n, reciter: state.reciter, offline };
@@ -178,7 +170,7 @@ async function playSurah(n, startAt = 0) {
   renderMini(); refreshRows(); if (!$("#playerSheet").hidden) renderPlayer();
 }
 function togglePlay() {
-  if (speakingFr) { speakingFr = false; speechSynthesis.cancel(); renderMiniBtn(); return; } if (!state.current) { const l = store.get("last", null); playSurah(l ? l.n : 1, l ? l.t : 0); return; } audio.paused ? audio.play() : audio.pause(); }
+  if (!state.current) { const l = store.get("last", null); playSurah(l ? l.n : 1, l ? l.t : 0); return; } audio.paused ? audio.play() : audio.pause(); }
 function nextSurah(d = 1) { if (!state.current) return; const n = state.current.n + d; if (n >= 1 && n <= 114) playSurah(n); }
 
 if ("mediaSession" in navigator) {
@@ -282,48 +274,53 @@ function render() {
 }
 
 // ---------- Écouter ----------
+let openRow = null; // ligne dont les actions sont dépliées
 function surahRow(n, mode) {
   const s = S(n), playing = state.current && state.current.n === n;
-  const fav = state.favs.has(n);
-  let dl;
-  if (state.downloading.has(n)) dl = `<button data-dl="${n}" aria-label="Téléchargement en cours"><span class="dl-pct">${state.downloading.get(n)}%</span></button>`;
-  else if (state.downloaded.has(n)) dl = `<button data-dl="${n}" class="done" data-act="undl" aria-label="Supprimer le téléchargement">${I.check}</button>`;
-  else dl = `<button data-dl="${n}" data-act="dl" aria-label="Télécharger pour écouter hors-ligne">${I.down}</button>`;
-  return `<div class="srow${playing ? " playing" : ""}" data-row="${n}">
-    <span class="snum">${n}</span>
-    <button class="smain" data-act="${mode === "lire" ? "read" : "play"}" data-n="${n}"><b>${esc(s.fr)}</b><small>${esc(s.tr)} · ${s.ayahs} v.</small></button>
-    <span class="sar">${s.ar}</span>
-    ${mode === "lire" ? "" : `<div class="sact"><button data-act="fav" data-n="${n}" aria-pressed="${fav}" aria-label="Favori">${fav ? I.starOn : I.star}</button>${dl}</div>`}
+  const fav = state.favs.has(n), dl = state.downloaded.has(n), pct = state.downloading.get(n);
+  const marks = (fav ? `<i class="mk star" title="Favori">${I.starOn}</i>` : "") + (dl ? `<i class="mk" title="Disponible hors-ligne">${I.check}</i>` : "") + (pct != null ? `<i class="mk pct">${pct}%</i>` : "");
+  const open = mode !== "lire" && openRow === n;
+  return `<div class="srow${playing ? " playing" : ""}${open ? " open" : ""}" data-row="${n}">
+    <div class="sline">
+      <span class="snum">${n}</span>
+      <button class="smain" data-act="${mode === "lire" ? "read" : "play"}" data-n="${n}"><b>${esc(s.fr)}${marks}</b><small>${esc(s.tr)} · ${s.ayahs} versets</small></button>
+      <span class="sar">${s.ar}</span>
+      ${mode === "lire" ? "" : `<button class="more" data-act="rowMenu" data-n="${n}" aria-label="Options de la sourate" aria-expanded="${open}">${I.dots}</button>`}
+    </div>
+    ${open ? `<div class="sacts">
+      <button data-act="fav" data-n="${n}">${fav ? I.starOn : I.star}${fav ? "Retirer des favoris" : "Favori"}</button>
+      ${pct != null ? `<button disabled>${I.down}${pct}%</button>` : dl ? `<button data-act="undl" data-dl="${n}">${I.trash}Supprimer</button>` : `<button data-act="dl" data-dl="${n}">${I.down}Télécharger</button>`}
+      <button data-act="read" data-n="${n}">${I.book}Lire</button>
+    </div>` : ""}
   </div>`;
 }
 function filtered(mode) {
-  const q = state.query.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const norm = (x) => x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['-]/g, " ");
+  const q = norm(state.query.trim());
   let ns = Array.from({ length: 114 }, (_, i) => i + 1);
   if (mode !== "lire") {
     if (state.filter === "favoris") ns = ns.filter((n) => state.favs.has(n));
     if (state.filter === "hors") ns = ns.filter((n) => state.downloaded.has(n));
     if (state.filter === "courtes") ns = ns.filter((n) => n >= 78);
   }
-  if (q) ns = ns.filter((n) => { const s = S(n); return String(n) === q || (s.fr + " " + s.tr).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/['-]/g, " ").includes(q.replace(/['-]/g, " ")) || s.ar.includes(q); });
+  if (q) ns = ns.filter((n) => { const s = S(n); return String(n) === q || norm(s.fr + " " + s.tr).includes(q) || s.ar.includes(state.query.trim()); });
   return ns;
 }
 function viewListen() {
-  const last = store.get("last", null);
-  const resume = last && !state.current ? (() => { const s = S(last.n); const r = RECITERS.find((x) => x.id === last.reciter) || rec(); return `<div class="resume"><span class="ar">${s.ar}</span><div><div class="eyebrow">Reprendre</div><b>${s.n}. ${esc(s.fr)}</b><div class="muted" style="font-size:13px">${esc(r.nom)} · ${fmt(last.t)}</div></div><button class="btn round" data-act="resume" aria-label="Reprendre">${I.play}</button></div>`; })() : "";
   const list = filtered("ecouter");
-  const empty = state.filter === "favoris" ? "Aucun favori. Touche l'étoile d'une sourate pour l'ajouter."
-    : state.filter === "hors" ? "Rien de téléchargé. Touche la flèche d'une sourate pour l'avoir sans réseau, dans le métro par exemple."
+  const empty = state.filter === "favoris" ? "Aucun favori. Touche ⋯ sur une sourate pour l'ajouter."
+    : state.filter === "hors" ? "Rien de téléchargé. Touche ⋯ sur une sourate pour l'avoir sans réseau."
     : "Aucune sourate ne correspond.";
   return `<section class="view">
-    ${resume}
-    <div class="field"><label class="eyebrow" for="reciterSel">Récitateur</label>
-      <select id="reciterSel">${RECITERS.map((r) => `<option value="${r.id}"${r.id === state.reciter ? " selected" : ""}>${esc(r.nom)}${r.note ? " — " + r.note : ""}</option>`).join("")}</select></div>
-    <div class="field"><span class="eyebrow">Comprendre en écoutant</span>${modePicker()}${state.verseMode ? `<p class="muted" style="font-size:13px">Chaque verset s'affiche en arabe et en français${state.speakFr ? ", puis la traduction est lue à voix haute" : ""}. Demande du réseau.</p>` : ""}</div>
-    <input class="search" id="q" type="search" placeholder="Chercher : Yâ-Sîn, 67, la caverne…" value="${esc(state.query)}" autocomplete="off">
-    <div class="chips" role="group" aria-label="Filtre">
-      ${[["tout", "Toutes"], ["favoris", "Favoris"], ["hors", "Hors-ligne"], ["courtes", "Juz' 'Amma"]].map(([id, l]) => `<button class="chip" data-filter="${id}" aria-pressed="${state.filter === id}">${l}</button>`).join("")}
+    <div class="searchbar">
+      <input class="search" id="q" type="search" placeholder="Chercher une sourate" value="${esc(state.query)}" autocomplete="off">
+      ${recGear()}
     </div>
-    <div class="list" id="slist">${list.length ? list.map((n) => surahRow(n)).join("") : `<div class="srow"><p class="muted">${empty}</p></div>`}</div>
+    <p class="recline">${esc(rec().nom)} · ${state.verseMode ? "avec traduction" : "récitation seule"}</p>
+    <div class="tabs-text" role="group" aria-label="Filtre">
+      ${[["tout", "Toutes"], ["favoris", "Favoris"], ["hors", "Hors-ligne"], ["courtes", "Juz' 'Amma"]].map(([id, l]) => `<button data-filter="${id}" aria-pressed="${state.filter === id}">${l}</button>`).join("")}
+    </div>
+    <div class="list" id="slist">${list.length ? list.map((n) => surahRow(n)).join("") : `<p class="empty">${empty}</p>`}</div>
   </section>`;
 }
 function refreshRows() {
@@ -333,19 +330,41 @@ function refreshRows() {
   });
 }
 
-const MODES = [["audio", "Récitation seule", "hors-ligne possible"], ["texte", "+ traduction écrite", "verset par verset"], ["voix", "+ traduction lue", "voix française"]];
-const curMode = () => (!state.verseMode ? "audio" : state.speakFr ? "voix" : "texte");
-const modePicker = () => `<div class="popts">${MODES.map(([id, l, sm]) => `<button data-mode="${id}" aria-pressed="${curMode() === id}">${l}<small>${sm}</small></button>`).join("")}</div>`;
+// Engrenage de la récitation : les réglages n'apparaissent qu'en le touchant.
+const seg = (key, opts, cur) => `<div class="segm">${opts.map(([v, l]) => `<button data-set="${key}" data-v="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join("")}</div>`;
+function recGear() {
+  return `<div class="gearwrap"><button class="icon-btn" data-act="recMenu" aria-label="Réglages de la récitation" aria-expanded="false">${I.gear}</button>
+    <div class="menu" id="recMenu" hidden></div></div>`;
+}
+function recMenuHtml() {
+  const sleepLeft = state.sleepAt ? Math.max(1, Math.round((state.sleepAt - Date.now()) / 60000)) : 0;
+  return `<div class="mrow"><span>Affichage</span>${seg("mode", [["audio", "Récitation"], ["texte", "+ Traduction"]], state.verseMode ? "texte" : "audio")}</div>
+    <div class="mrow"><label for="reciterSel">Récitateur</label>
+      <select id="reciterSel">${RECITERS.map((r) => `<option value="${r.id}"${r.id === state.reciter ? " selected" : ""}>${esc(r.nom)}${r.note ? " · " + r.note : ""}</option>`).join("")}</select></div>
+    <div class="mrow"><span>À la fin</span>${seg("repeat", [["suite", "Continuer"], ["une", "Répéter"], ["stop", "Arrêter"]], state.repeat)}</div>
+    <div class="mrow"><span>Vitesse</span>${seg("rate", [[0.75, "0,75×"], [1, "1×"], [1.25, "1,25×"]], state.rate)}</div>
+    <div class="mrow"><span>Minuterie${sleepLeft ? ` · ${sleepLeft} min` : ""}</span>${seg("sleep", [[0, "Non"], [15, "15 min"], [30, "30"], [60, "60"]], state.sleepAt ? state.sleepMin : 0)}</div>`;
+}
+function toggleRecMenu(btn) {
+  const menu = btn.parentElement.querySelector(".menu");
+  const show = menu.hidden;
+  document.querySelectorAll(".menu").forEach((m) => { m.hidden = true; m.parentElement.querySelector("[aria-expanded]").setAttribute("aria-expanded", "false"); });
+  if (show) { menu.innerHTML = recMenuHtml(); menu.hidden = false; btn.setAttribute("aria-expanded", "true"); }
+}
+function refreshRecMenu() { document.querySelectorAll(".menu:not([hidden])").forEach((m) => (m.innerHTML = recMenuHtml())); const rl = $(".recline"); if (rl) rl.textContent = `${rec().nom} · ${state.verseMode ? "avec traduction" : "récitation seule"}`; }
 function setMode(m) {
-  state.verseMode = m !== "audio"; state.speakFr = m === "voix";
-  store.set("verseMode", state.verseMode); store.set("speakFr", state.speakFr);
+  state.verseMode = m === "texte"; store.set("verseMode", state.verseMode);
   if (state.current) {
     const c = state.current;
-    if (state.verseMode) playVerseMode(c.n, c.k || 1); else if (c.k != null) playSurah(c.n);
+    if (state.verseMode && c.k == null) playVerseMode(c.n, 1);
+    else if (!state.verseMode && c.k != null) playSurah(c.n);
   }
-  if (state.tab === "ecouter") render();
+  refreshRecMenu();
   if (!$("#playerSheet").hidden) renderPlayer();
 }
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".gearwrap")) document.querySelectorAll(".menu:not([hidden])").forEach((m) => { m.hidden = true; m.parentElement.querySelector("[aria-expanded]").setAttribute("aria-expanded", "false"); });
+}, true);
 
 // ---------- Mini lecteur et lecteur plein écran ----------
 function renderMiniBtn() { const b = $("#miniPlay"); b.innerHTML = audio.paused ? I.play : I.pause; b.setAttribute("aria-label", audio.paused ? "Lecture" : "Pause"); }
@@ -356,67 +375,51 @@ function renderMini() {
   if (!n) { mini.hidden = true; return; }
   mini.hidden = false;
   const s = S(n);
-  $("#miniTitle").textContent = `${s.n}. ${s.fr}`;
-  $("#miniSub").textContent = `${state.current ? rec().nom + (state.current.k ? ` · verset ${state.current.k}/${s.ayahs}` : "") : "Touche lecture pour reprendre"}${state.current && state.current.offline ? " · hors-ligne" : ""}`;
+  $("#miniTitle").textContent = s.fr;
+  $("#miniSub").textContent = state.current ? (state.current.k ? `Verset ${state.current.k} sur ${s.ayahs}` : rec().nom) + (state.current.offline ? " · hors-ligne" : "") : "Reprendre l'écoute";
   $("#miniNext").innerHTML = I.next; renderMiniBtn();
 }
 function openPlayer() { if (!state.current) { const l = store.get("last", null); if (l) playSurah(l.n, l.t); else return; } $("#playerSheet").hidden = false; document.body.style.overflow = "hidden"; renderPlayer(); }
 function closeSheet(id) { $(id).hidden = true; document.body.style.overflow = ""; }
+const verseHtml = (v, last) => `<div class="fv${last ? " now" : ""}" data-fk="${v.n}-${v.k}"><span class="fk">${v.k}</span><p class="q">${v.ar}</p><p class="fr">${esc(v.fr)}</p></div>`;
 function renderPlayer() {
   if (!state.current) return;
-  const s = S(state.current.n);
-  const sleepLeft = state.sleepAt ? Math.max(0, Math.round((state.sleepAt - Date.now()) / 60000)) : 0;
-  $("#playerSheet").innerHTML = `<div class="sheet-in">
-    <div class="sheet-head"><button class="icon-btn" data-act="closePlayer" aria-label="Fermer">${I.chevDown}</button><div class="eyebrow">En écoute</div><button class="icon-btn" data-act="read" data-n="${s.n}" aria-label="Lire le texte">${I.book}</button></div>
-    ${state.current.a ? `<div class="vpanel"><div class="eyebrow">Verset ${state.current.k} sur ${s.ayahs}</div><p class="q">${state.current.a.ar}</p><p class="fr">${esc(state.current.a.fr)}</p></div>` : `<div class="player-art"><canvas id="art"></canvas><span class="ar">${s.ar}</span></div>`}
-    <div class="ptitle"><b>${s.n}. ${esc(s.fr)}</b><span class="muted">${esc(s.tr)} · ${esc(rec().nom)}${state.current.offline ? " · hors-ligne" : ""}</span></div>
-    <div class="seek"><input type="range" id="seek" min="0" step="1" value="${audio.currentTime || 0}" max="${audio.duration || 0}" aria-label="Position"><div class="row"><span id="tCur">${fmt(audio.currentTime)}</span><span id="tDur">${fmt(audio.duration)}</span></div></div>
-    <div class="pctl">
-      <button data-act="prev" aria-label="Sourate précédente">${I.prev}</button>
-      <button data-act="back15" aria-label="Reculer de 15 secondes">${I.back15}</button>
-      <button class="big" id="bigPlay" data-act="toggle" aria-label="Lecture ou pause">${audio.paused ? I.play : I.pause}</button>
-      <button data-act="fwd15" aria-label="Avancer de 15 secondes">${I.fwd15}</button>
-      <button data-act="next" aria-label="Sourate suivante">${I.next}</button>
+  const s = S(state.current.n), vm = state.current.k != null;
+  $("#playerSheet").innerHTML = `<div class="player">
+    <div class="phead">
+      <button class="icon-btn" data-act="closePlayer" aria-label="Fermer">${I.chevDown}</button>
+      <div class="ptitle"><b>${esc(s.fr)}</b><small id="pSub">${esc(s.tr)} · ${vm ? `verset ${state.current.k}/${s.ayahs}` : esc(rec().nom)}</small></div>
+      ${recGear()}
     </div>
-    <div>
-      <div class="eyebrow" style="margin-bottom:8px">Comprendre en écoutant</div>
-      ${modePicker()}
-    </div>
-    <div>
-      <div class="eyebrow" style="margin-bottom:8px">À la fin de la sourate</div>
-      <div class="popts">${[["suite", "Continuer", "sourate suivante"], ["une", "Répéter", "la même"], ["stop", "Arrêter", "pause"]].map(([id, l, sm]) => `<button data-repeat="${id}" aria-pressed="${state.repeat === id}">${l}<small>${sm}</small></button>`).join("")}</div>
-    </div>
-    <div>
-      <div class="eyebrow" style="margin-bottom:8px">Vitesse</div>
-      <div class="popts">${[0.75, 1, 1.25].map((r) => `<button data-rate="${r}" aria-pressed="${state.rate === r}">${String(r).replace(".", ",")}×<small>${r < 1 ? "pour suivre" : r > 1 ? "révision" : "normale"}</small></button>`).join("")}</div>
-    </div>
-    <div>
-      <div class="eyebrow" style="margin-bottom:8px">Minuterie${sleepLeft ? ` · pause dans ${sleepLeft} min` : ""}</div>
-      <div class="popts">${[15, 30, 60].map((m) => `<button data-sleep="${m}">${m} min<small>puis pause</small></button>`).join("")}</div>
-      ${state.sleepAt ? `<button class="btn ghost" style="margin-top:8px;width:100%" data-sleep="0">Annuler la minuterie</button>` : ""}
+    ${vm ? `<div class="feed" id="feed">${s.n !== 1 && s.n !== 9 && feed[0] && feed[0].k === 1 ? `<p class="basmala">${BASMALA}</p>` : ""}${feed.map((v, i) => verseHtml(v, i === feed.length - 1)).join("")}</div>`
+      : `<div class="pcover"><span class="ar">${s.ar}</span><span class="muted">Sourate ${s.n} · ${s.ayahs} versets · ${s.type}</span></div>`}
+    <div class="pbottom">
+      <div class="seek"><input type="range" id="seek" min="0" step="1" value="${audio.currentTime || 0}" max="${audio.duration || 0}" aria-label="Position"><div class="row"><span id="tCur">${fmt(audio.currentTime)}</span><span id="tDur">${fmt(audio.duration)}</span></div></div>
+      <div class="pctl">
+        <button data-act="prev" aria-label="Sourate précédente">${I.prev}</button>
+        <button class="big" id="bigPlay" data-act="toggle" aria-label="Lecture ou pause">${audio.paused ? I.play : I.pause}</button>
+        <button data-act="next" aria-label="Sourate suivante">${I.next}</button>
+      </div>
     </div>
   </div>`;
-  drawArt($("#art"), s.n);
+  const f = $("#feed"); if (f) f.scrollTop = f.scrollHeight;
 }
-// Motif géométrique (étoile à huit branches) propre à chaque sourate.
-function drawArt(cv, n) {
-  if (!cv) return; const r = cv.getBoundingClientRect(); const d = devicePixelRatio || 1;
-  cv.width = r.width * d; cv.height = r.height * d; const x = cv.getContext("2d"); x.scale(d, d);
-  const cs = getComputedStyle(document.documentElement);
-  x.strokeStyle = cs.getPropertyValue("--gold").trim(); x.globalAlpha = 0.18; x.lineWidth = 1;
-  const step = 46 + (n % 5) * 6, k = 0.38 + (n % 7) * 0.03;
-  for (let cy = 0; cy < r.height + step; cy += step) for (let cx = 0; cx < r.width + step; cx += step) {
-    x.beginPath();
-    for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 + Math.PI / 8 * (n % 2), rad = i % 2 ? step * k * 0.55 : step * k; const px = cx + Math.cos(a) * rad, py = cy + Math.sin(a) * rad; i ? x.lineTo(px, py) : x.moveTo(px, py); }
-    x.closePath(); x.stroke();
-  }
+// Ajoute le nouveau verset en bas ; les précédents remontent et s'estompent.
+function updateFeed() {
+  const f = $("#feed"); if (!f) return;
+  const v = feed[feed.length - 1];
+  f.querySelectorAll(".fv.now").forEach((e) => e.classList.remove("now"));
+  if (!f.querySelector(`[data-fk="${v.n}-${v.k}"]`)) f.insertAdjacentHTML("beforeend", verseHtml(v, true));
+  else f.querySelector(`[data-fk="${v.n}-${v.k}"]`).classList.add("now");
+  const s = S(v.n); const sub = $("#pSub"); if (sub) sub.textContent = `${s.tr} · verset ${v.k}/${s.ayahs}`;
+  f.scrollTo({ top: f.scrollHeight, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
 // ---------- Lire ----------
 function viewRead() {
   return `<section class="view">
-    <div><h2>Lire le Coran</h2><p class="muted">Texte arabe, phonétique et traduction française de Hamidullah. Touche « Écouter » sur un verset pour lancer la récitation à partir de là : le verset en cours est surligné.</p></div>
-    <input class="search" id="q" type="search" placeholder="Chercher une sourate…" value="${esc(state.query)}" autocomplete="off">
+    
+    <input class="search" id="q" type="search" placeholder="Chercher une sourate à lire" value="${esc(state.query)}" autocomplete="off">
     <div class="list">${filtered("lire").map((n) => surahRow(n, "lire")).join("")}</div>
   </section>`;
 }
@@ -592,7 +595,7 @@ function applyTheme() {
   const t = store.get("theme", null);
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   const dark = t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  $("#themeBtn").innerHTML = dark ? I.sun : I.moon;
+  const tb = $("#themeBtn"); if (tb) tb.innerHTML = dark ? I.sun : I.moon;
   document.querySelector('meta[name="theme-color"]').content = dark ? "#0f1716" : "#f2f4f2";
 }
 
@@ -615,7 +618,14 @@ document.addEventListener("click", (e) => {
     if (ok) setTimeout(() => { if (quiz && quiz.answered === i && state.learn === "quiz") { newQuestion(); render(); } }, 900);
     return render();
   }
-  if (d.mode) return setMode(d.mode);
+  if (d.set) {
+    const v = d.v;
+    if (d.set === "mode") return setMode(v);
+    if (d.set === "repeat") { state.repeat = v; store.set("repeat", v); }
+    if (d.set === "rate") { state.rate = +v; audio.playbackRate = state.rate; store.set("rate", state.rate); }
+    if (d.set === "sleep") { const m = +v; state.sleepMin = m; state.sleepAt = m ? Date.now() + m * 60000 : 0; if (m) toast(`Pause automatique dans ${m} minutes.`); }
+    return refreshRecMenu();
+  }
   if (d.day) { dayOffset += +d.day; return render(); }
   if (d.repeat) { state.repeat = d.repeat; store.set("repeat", d.repeat); return renderPlayer(); }
   if (d.rate) { state.rate = +d.rate; audio.playbackRate = state.rate; store.set("rate", state.rate); return renderPlayer(); }
@@ -630,6 +640,8 @@ document.addEventListener("click", (e) => {
     case "read": openReader(n); break;
     case "resume": { const l = store.get("last", null); if (l) { if (l.reciter !== state.reciter) { state.reciter = l.reciter; store.set("reciter", l.reciter); loadDownloaded().then(render); } playSurah(l.n, l.t); render(); } break; }
     case "fav": state.favs.has(n) ? state.favs.delete(n) : state.favs.add(n); store.set("favs", [...state.favs]); refreshRows(); break;
+    case "rowMenu": openRow = openRow === n ? null : n; refreshRows(); break;
+    case "recMenu": toggleRecMenu(t); break;
     case "dl": download(+t.dataset.dl); break;
     case "undl": removeDownload(+t.dataset.dl); break;
     case "toggle": togglePlay(); break;
@@ -667,7 +679,7 @@ document.addEventListener("input", (e) => {
   if (e.target.id === "seek") { e.target.dataset.drag = "1"; $("#tCur").textContent = fmt(+e.target.value); }
 });
 document.addEventListener("change", async (e) => {
-  if (e.target.id === "reciterSel") { state.reciter = e.target.value; store.set("reciter", state.reciter); await loadDownloaded(); render(); if (state.current) { const t = audio.currentTime; const playing = !audio.paused; if (playing) playSurah(state.current.n); else { state.current = null; renderMini(); } } }
+  if (e.target.id === "reciterSel") { state.reciter = e.target.value; store.set("reciter", state.reciter); await loadDownloaded(); if (state.tab === "ecouter") { const m = $(".view .menu"); const open = m && !m.hidden; render(); if (open) toggleRecMenu($(".view [data-act=recMenu]")); } refreshRecMenu(); if (state.current) { const t = audio.currentTime; const playing = !audio.paused; if (playing) playSurah(state.current.n); else { state.current = null; renderMini(); } } }
   if (e.target.id === "citySel" && e.target.value) { const c = CITIES.find((x) => x[0] === e.target.value); setPrayer({ loc: { name: c[0], lat: c[1], lng: c[2] } }); }
   if (e.target.id === "methodSel") setPrayer({ method: e.target.value });
   if (e.target.id === "asrSel") setPrayer({ asr: +e.target.value });
@@ -676,7 +688,7 @@ document.addEventListener("change", async (e) => {
 $("#miniPlay").onclick = (e) => { e.stopPropagation(); togglePlay(); };
 $("#miniNext").onclick = (e) => { e.stopPropagation(); nextSurah(1); };
 $("#miniOpen").onclick = openPlayer;
-$("#themeBtn").onclick = () => {
+if ($("#themeBtn")) $("#themeBtn").onclick = () => {
   const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   store.set("theme", cur === "dark" ? "light" : "dark"); applyTheme(); if (!$("#playerSheet").hidden) renderPlayer();
 };
