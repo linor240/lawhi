@@ -69,11 +69,14 @@ h3 { margin: 0; font-size: 15px; font-weight: 700; }
 
 /* En-tête */
 header.top {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg);
+  position: sticky; top: var(--sat); z-index: 20; background: var(--bg);
   padding: 10px max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px));
   display: flex; align-items: center; gap: 8px;
 }
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--bg); }
+/* Haut de l'écran : barre d'état du téléphone. L'appli Android peut fournir --safe-area-inset-top quand env() vaut 0. */
+:root { --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)); }
+body { padding-top: var(--sat); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--sat); z-index: 21; background: var(--bg); }
 .brand { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 .brand h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
 .brand .ar { font-size: 16px; color: var(--gold); }
@@ -178,7 +181,7 @@ nav.tabs {
 /* Feuilles plein écran */
 .sheet {
   position: fixed; inset: 0; z-index: 50; background: var(--bg); overflow-y: auto; overscroll-behavior: contain;
-  padding: calc(env(safe-area-inset-top, 0px) + 6px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) max(16px, env(safe-area-inset-left, 0px));
+  padding: calc(var(--sat) + 6px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) max(16px, env(safe-area-inset-left, 0px));
 }
 .sheet-in { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
 .sheet-head { display: flex; align-items: center; gap: 8px; position: sticky; top: -6px; background: var(--bg); padding: 6px 0; z-index: 2; }
