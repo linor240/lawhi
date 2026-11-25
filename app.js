@@ -10,11 +10,14 @@ const RECITERS = [
   { id: "sudais", ev: "Abdurrahmaan_As-Sudais_192kbps", nom: "Abdul Rahman al-Sudais", slug: "abdulrahman-sudais/r1" },
   { id: "maher", ev: "MaherAlMuaiqly128kbps", nom: "Maher al-Muaiqly", slug: "maher-muaiqly/r1" },
   { id: "dosari", ev: "Yasser_Ad-Dussary_128kbps", nom: "Yasser al-Dosari", slug: "yasser-dosari/r1" },
-  { id: "qatami", ev: "Nasser_Alqatami_128kbps", nom: "Nasser al-Qatami", slug: "nasser-qatami/r1" }
+  { id: "qatami", ev: "Nasser_Alqatami_128kbps", nom: "Nasser al-Qatami", slug: "nasser-qatami/r1" },
+  // Pas de version verset par verset, et 5 sourates absentes chez mp3quran : la voix d'Alafasy les remplace.
+  { id: "sobhi", nom: "Islam Sobhi", slug: "islam-sobhi/r1", manque: [37, 39, 40, 45, 65], note: "traduction avec la voix d'Alafasy" }
 ];
 const pad3 = (n) => String(n).padStart(3, "0");
-const surahUrl = (rec, n) => `https://cdn.mp3quran.net/audio/${rec.slug}/${pad3(n)}.mp3`;
-const ayahUrl = (r, s, a) => `https://everyayah.com/data/${r.ev}/${pad3(s)}${pad3(a)}.mp3`;
+const srcRec = (rec, n) => (rec.manque && rec.manque.includes(n) ? RECITERS[0] : rec);
+const surahUrl = (rec, n) => `https://cdn.mp3quran.net/audio/${srcRec(rec, n).slug}/${pad3(n)}.mp3`;
+const ayahUrl = (r, s, a) => `https://everyayah.com/data/${r.ev || RECITERS[0].ev}/${pad3(s)}${pad3(a)}.mp3`;
 const textUrl = (n) => `https://api.alquran.cloud/v1/surah/${n}/editions/quran-uthmani,en.transliteration,fr.hamidullah`;
 const S = (n) => { const s = window.SURAHS[n - 1]; return { n, ar: s[0], tr: s[1], fr: s[2], ayahs: s[3], type: s[4] }; };
 const BASMALA = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
@@ -214,8 +217,7 @@ async function loadDownloaded() {
   try {
     const c = await caches.open(AUDIO_CACHE);
     const keys = await c.keys();
-    const prefix = `https://cdn.mp3quran.net/audio/${rec().slug}/`;
-    keys.forEach((k) => { if (k.url.startsWith(prefix)) state.downloaded.add(parseInt(k.url.slice(prefix.length), 10)); });
+    for (let n = 1; n <= 114; n++) if (keys.some((k) => k.url === surahUrl(rec(), n))) state.downloaded.add(n);
   } catch {}
 }
 async function download(n) {
