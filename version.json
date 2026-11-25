@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "date": "2026-11-25",
   "notes": [
-    "Lawhi existe maintenant en appli Android. Dans l'appli, Prières › Réglages propose une notification à l'heure de chaque prière."
+    "Correction : dans l'appli Android, le choix Chiffres / Horloge de l'onglet Prières était caché sous l'en-tête."
   ]
 }
