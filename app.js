@@ -73,6 +73,9 @@ const I = {
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>',
   dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
   menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4v-17Z"/></svg>',
+  bookmarkOn: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4v-17Z"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>'
 };
 
@@ -144,6 +147,7 @@ async function playVerseMode(n, k = 1) {
   if (!$("#playerSheet").hidden) { if (changed || !$("#feed")) renderPlayer(); else updateFeed(); }
 }
 function markVerse(n, k) {
+  updateReaderBar();
   if ($("#readerSheet").hidden || readingN !== n) return;
   document.querySelectorAll(".ayah.on").forEach((e) => e.classList.remove("on"));
   const el = document.querySelector(`.ayah[data-k="${k}"]`); if (el) { el.classList.add("on"); el.scrollIntoView({ block: "center", behavior: "smooth" }); }
@@ -194,7 +198,7 @@ audio.addEventListener("timeupdate", () => {
     try { navigator.mediaSession.setPositionState({ duration: audio.duration, position: audio.currentTime, playbackRate: audio.playbackRate }); } catch {}
   }
 });
-["play", "pause"].forEach((e) => audio.addEventListener(e, () => { renderMiniBtn(); const b = $("#bigPlay"); if (b) b.innerHTML = audio.paused ? I.play : I.pause; }));
+["play", "pause"].forEach((e) => audio.addEventListener(e, () => { renderMiniBtn(); updateReaderBar(); const b = $("#bigPlay"); if (b) b.innerHTML = audio.paused ? I.play : I.pause; }));
 audio.addEventListener("ended", () => {
   if (!state.current) return;
   if (state.current.k != null) return afterVerse();
@@ -273,6 +277,37 @@ function render() {
   else m.innerHTML = viewHistory();
 }
 
+// ---------- Marque-pages et reprise de lecture ----------
+// marks : marque-page posé à la main ; readPos : dernier verset lu (enregistré tout seul en faisant défiler).
+const marks = store.get("marks", {}), readPos = store.get("readPos", {});
+function resumeBtn(n) {
+  const m = marks[n], p = readPos[n];
+  if (m) return `<button class="bm on" data-act="readAt" data-n="${n}" data-k="${m}" aria-label="Aller au marque-page, verset ${m}">${I.bookmarkOn}<span>v. ${m}</span></button>`;
+  if (p > 1) return `<button class="bm" data-act="readAt" data-n="${n}" data-k="${p}" aria-label="Reprendre au verset ${p}">${I.play}<span>v. ${p}</span></button>`;
+  return "";
+}
+function toggleMark(n, k) {
+  if (marks[n] === k) delete marks[n]; else marks[n] = k;
+  store.set("marks", marks);
+  document.querySelectorAll(".ayah.marked").forEach((e) => e.classList.remove("marked"));
+  document.querySelectorAll(".ayah [data-act=mark]").forEach((b) => { b.innerHTML = I.bookmark + "Marque-page"; b.setAttribute("aria-pressed", "false"); });
+  if (marks[n]) {
+    const el = document.querySelector(`.ayah[data-k="${k}"]`);
+    if (el) { el.classList.add("marked"); const b = el.querySelector("[data-act=mark]"); b.innerHTML = I.bookmarkOn + "Marque-page"; b.setAttribute("aria-pressed", "true"); }
+    toast(`Marque-page posé au verset ${k}.`);
+  } else toast("Marque-page retiré.");
+}
+let readSaveT = 0;
+function trackReading() {
+  const sh = $("#readerSheet"); if (sh.hidden || readingN == null) return;
+  clearTimeout(readSaveT);
+  readSaveT = setTimeout(() => {
+    const top = sh.getBoundingClientRect().top + 90;
+    const first = [...sh.querySelectorAll(".ayah")].find((a) => a.getBoundingClientRect().bottom > top);
+    if (first) { readPos[readingN] = +first.dataset.k; store.set("readPos", readPos); }
+  }, 400);
+}
+
 // ---------- Écouter ----------
 let openRow = null; // ligne dont les actions sont dépliées
 function surahRow(n, mode) {
@@ -285,7 +320,7 @@ function surahRow(n, mode) {
       <span class="snum">${n}</span>
       <button class="smain" data-act="${mode === "lire" ? "read" : "play"}" data-n="${n}"><b>${esc(s.fr)}${marks}</b><small>${esc(s.tr)} · ${s.ayahs} versets</small></button>
       <span class="sar">${s.ar}</span>
-      ${mode === "lire" ? "" : `<button class="more" data-act="rowMenu" data-n="${n}" aria-label="Options de la sourate" aria-expanded="${open}">${I.dots}</button>`}
+      ${mode === "lire" ? resumeBtn(n) : `<button class="more" data-act="rowMenu" data-n="${n}" aria-label="Options de la sourate" aria-expanded="${open}">${I.dots}</button>`}
     </div>
     ${open ? `<div class="sacts">
       <button data-act="fav" data-n="${n}">${fav ? I.starOn : I.star}${fav ? "Retirer des favoris" : "Favori"}</button>
@@ -417,8 +452,9 @@ function updateFeed() {
 
 // ---------- Lire ----------
 function viewRead() {
+  const ms = Object.entries(marks).map(([n, k]) => [+n, k]).sort((a, b) => a[0] - b[0]);
   return `<section class="view">
-    
+    ${ms.length ? `<div class="field"><span class="eyebrow">Marque-pages</span><div class="chips">${ms.map(([n, k]) => `<button class="chip" data-act="readAt" data-n="${n}" data-k="${k}">${I.bookmarkOn}${esc(S(n).fr)} · v. ${k}</button>`).join("")}</div></div>` : ""}
     <input class="search" id="q" type="search" placeholder="Chercher une sourate à lire" value="${esc(state.query)}" autocomplete="off">
     <div class="list">${filtered("lire").map((n) => surahRow(n, "lire")).join("")}</div>
   </section>`;
@@ -437,32 +473,51 @@ async function getText(n) {
   textCache.set(n, ayahs); return ayahs;
 }
 let readingN = null;
-async function openReader(n) {
+async function openReader(n, goTo) {
   readingN = n; closeSheet("#playerSheet");
   const sh = $("#readerSheet"); sh.hidden = false; document.body.style.overflow = "hidden"; sh.scrollTop = 0;
   const s = S(n);
   sh.innerHTML = `<div class="sheet-in">
-    <div class="sheet-head"><button class="icon-btn" data-act="closeReader" aria-label="Fermer">${I.close}</button><div><b>${s.n}. ${esc(s.fr)}</b><div class="muted" style="font-size:12.5px">${esc(s.tr)} · ${s.ayahs} versets</div></div><button class="icon-btn" data-act="play" data-n="${n}" aria-label="Écouter la sourate">${I.ear}</button></div>
+    <div class="sheet-head"><button class="icon-btn" data-act="closeReader" aria-label="Fermer">${I.close}</button><div><b>${s.n}. ${esc(s.fr)}</b><div class="muted" style="font-size:12.5px">${esc(s.tr)} · ${s.ayahs} versets</div></div><button class="icon-btn" data-act="verses" data-n="${n}" aria-label="Écouter verset par verset">${I.ear}</button></div>
     <div class="toggles">
       <button class="chip" data-tog="showTr" aria-pressed="${state.showTr}">Phonétique</button>
       <button class="chip" data-tog="showFr" aria-pressed="${state.showFr}">Traduction</button>
-      <button class="chip" data-act="verses" data-n="${n}">${I.play.replace("<svg", '<svg width="14" height="14" style="vertical-align:-2px"')} Verset par verset</button>
       <button class="chip" data-size="-2" aria-label="Texte plus petit">A−</button><button class="chip" data-size="2" aria-label="Texte plus grand">A+</button>
     </div>
     <div id="ayahs"><p class="muted">Chargement du texte…</p></div>
-  </div>`;
+  </div>
+  <div class="rbar" id="rbar" hidden></div>`;
+  sh.onscroll = trackReading;
   try {
     const ayahs = await getText(n); if (readingN !== n) return;
-    $("#ayahs").innerHTML = (n !== 1 && n !== 9 ? `<p class="basmala">${BASMALA}</p>` : "") + ayahs.map((a) => `<div class="ayah" data-k="${a.k}" style="--qsize:${state.qsize}px">
+    $("#ayahs").innerHTML = (n !== 1 && n !== 9 ? `<p class="basmala">${BASMALA}</p>` : "") + ayahs.map((a) => { const mk = marks[n] === a.k; return `<div class="ayah${mk ? " marked" : ""}" data-k="${a.k}" style="--qsize:${state.qsize}px">
       <p class="q">${a.ar}<span class="num">${a.k}</span></p>
       <p class="tr"${state.showTr ? "" : " hidden"}>${esc(a.tr)}</p>
       <p class="fr"${state.showFr ? "" : " hidden"}>${esc(a.fr)}</p>
-      <div class="ayah-tools"><button data-act="verse" data-n="${n}" data-k="${a.k}">${I.speaker}Écouter à partir du verset ${a.k}</button></div>
-    </div>`).join("");
+      <div class="ayah-tools"><button data-act="verse" data-n="${n}" data-k="${a.k}">${I.speaker}Écouter d'ici</button><button data-act="mark" data-n="${n}" data-k="${a.k}" aria-pressed="${mk}">${mk ? I.bookmarkOn : I.bookmark}Marque-page</button></div>
+    </div>`; }).join("");
+    if (goTo > 1) { const el = sh.querySelector(`.ayah[data-k="${goTo}"]`); if (el) el.scrollIntoView({ block: "start" }); sh.scrollTop -= 70; }
+    updateReaderBar();
   } catch {
     $("#ayahs").innerHTML = `<p class="note">Le texte n'a pas pu être chargé. Il faut du réseau la première fois, ensuite la sourate reste disponible hors-ligne.</p>`;
   }
 }
+// Barre qui suit le défilement pendant l'écoute : pause, arrêt, retour au verset en cours.
+function updateReaderBar() {
+  const bar = $("#rbar"); if (!bar) return;
+  const c = state.current;
+  if ($("#readerSheet").hidden || !c || c.k == null || c.n !== readingN) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = `<button class="rb-go" data-act="goVerse" aria-label="Aller au verset en cours">${audio.paused ? "En pause" : "Écoute"} · verset ${c.k}</button>
+    <button class="rb-btn" data-act="toggle" aria-label="${audio.paused ? "Reprendre" : "Pause"}">${audio.paused ? I.play : I.pause}</button>
+    <button class="rb-btn" data-act="stopListen" aria-label="Arrêter l'écoute">${I.stop}</button>`;
+}
+function stopListen() {
+  audio.pause(); state.current = null;
+  document.querySelectorAll(".ayah.on").forEach((e) => e.classList.remove("on"));
+  updateReaderBar(); renderMini(); refreshRows();
+}
+
 // ---------- Apprendre ----------
 const LEARN_TABS = [["alphabet", "Alphabet"], ["lecons", "Leçons"], ["ecrire", "Écrire"], ["quiz", "Quiz"], ["essentiel", "L'essentiel"]];
 let learnDetail = null; // lettre ouverte ou leçon ouverte
@@ -627,6 +682,7 @@ document.addEventListener("click", (e) => {
     return refreshRecMenu();
   }
   if (d.day) { dayOffset += +d.day; return render(); }
+  if (d.pview) return setPrayer({ view: d.pview });
   if (d.repeat) { state.repeat = d.repeat; store.set("repeat", d.repeat); return renderPlayer(); }
   if (d.rate) { state.rate = +d.rate; audio.playbackRate = state.rate; store.set("rate", state.rate); return renderPlayer(); }
   if (d.sleep != null) { const m = +d.sleep; state.sleepAt = m ? Date.now() + m * 60000 : 0; if (m) toast(`Pause automatique dans ${m} minutes.`); return renderPlayer(); }
@@ -658,9 +714,13 @@ document.addEventListener("click", (e) => {
     case "back15": audio.currentTime = Math.max(0, audio.currentTime - 15); break;
     case "fwd15": audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 15); break;
     case "closePlayer": closeSheet("#playerSheet"); break;
-    case "closeReader": closeSheet("#readerSheet"); break;
+    case "closeReader": closeSheet("#readerSheet"); if (state.tab === "lire") render(); break;
     case "verse": playVerseMode(n, +d.k); break;
     case "verses": playVerseMode(n, 1); break;
+    case "readAt": openReader(n, +d.k); break;
+    case "mark": toggleMark(n, +d.k); break;
+    case "stopListen": stopListen(); break;
+    case "goVerse": if (state.current && state.current.k) markVerse(state.current.n, state.current.k); break;
     case "learnBack": learnDetail = null; render(); break;
     case "lessonDone": state.lessonsDone.add(window.LESSONS[+d.i].id); store.set("lessonsDone", [...state.lessonsDone]); render(); break;
     case "traceThis": traceIdx = +d.i; traceForm = 0; state.learn = "ecrire"; learnDetail = null; render(); break;
@@ -680,7 +740,8 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("change", async (e) => {
   if (e.target.id === "reciterSel") { state.reciter = e.target.value; store.set("reciter", state.reciter); await loadDownloaded(); if (state.tab === "ecouter") { const m = $(".view .menu"); const open = m && !m.hidden; render(); if (open) toggleRecMenu($(".view [data-act=recMenu]")); } refreshRecMenu(); if (state.current) { const t = audio.currentTime; const playing = !audio.paused; if (playing) playSurah(state.current.n); else { state.current = null; renderMini(); } } }
-  if (e.target.id === "citySel" && e.target.value) { const c = CITIES.find((x) => x[0] === e.target.value); setPrayer({ loc: { name: c[0], lat: c[1], lng: c[2] } }); }
+  if (e.target.id === "countrySel") setCountry(e.target.value);
+  if (e.target.id === "citySel" && e.target.value) setCity(e.target.value);
   if (e.target.id === "methodSel") setPrayer({ method: e.target.value });
   if (e.target.id === "asrSel") setPrayer({ asr: +e.target.value });
   if (e.target.id === "seek") { audio.currentTime = +e.target.value; delete e.target.dataset.drag; }

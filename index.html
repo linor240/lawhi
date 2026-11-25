@@ -236,6 +236,23 @@ nav.tabs {
 .ayah-tools button { font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 4px 0; display: inline-flex; gap: 6px; align-items: center; }
 .ayah-tools svg { width: 14px; height: 14px; }
 .toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+.ayah-tools { gap: 16px; }
+.ayah-tools [aria-pressed="true"] { color: var(--gold); }
+.ayah.marked { box-shadow: inset 3px 0 0 var(--gold); padding-left: 12px; }
+.bm { display: inline-flex; align-items: center; gap: 4px; padding: 6px 9px; border-radius: 10px; background: var(--surface-2); font-size: 12px; font-weight: 700; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
+.bm svg { width: 13px; height: 13px; }
+.bm.on { color: var(--gold); }
+.chip svg { width: 13px; height: 13px; color: var(--gold); }
+/* Barre d'écoute qui suit le défilement dans la lecture */
+.rbar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 55;
+  display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 16px; border-radius: 999px;
+  background: var(--fg); color: var(--bg); box-shadow: 0 10px 30px rgb(0 0 0 / 0.25); max-width: calc(100% - 32px);
+}
+.rb-go { font-size: 13.5px; font-weight: 600; white-space: nowrap; padding-right: 6px; font-variant-numeric: tabular-nums; }
+.rb-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 14%, transparent); }
+.rb-btn svg { width: 20px; height: 20px; }
+#readerSheet .sheet-in { padding-bottom: 80px; }
 .toggles svg { width: 14px; height: 14px; }
 
 /* Apprendre */
@@ -315,6 +332,11 @@ nav.tabs {
 .prow.sun .pname, .prow.sun b { color: var(--muted); font-weight: 500; }
 .prow.past { opacity: 0.45; }
 .prow.on b, .prow.on .pname { color: var(--accent); }
+.prow.withclock { padding: 8px 0; }
+.prow.on .clock circle:first-child { stroke: var(--accent); stroke-width: 3; }
+.next.withclock .clock { flex: none; }
+.next.withclock b { font-size: 26px; }
+.segm svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
 .wtable { overflow-x: auto; }
 .wtable table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .wtable th, .wtable td { padding: 7px 3px; text-align: center; white-space: nowrap; border-top: 1px solid var(--line); }

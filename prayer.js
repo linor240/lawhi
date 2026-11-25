@@ -7,8 +7,10 @@
   const fix = (a, b) => { a = a - b * Math.floor(a / b); return a < 0 ? a + b : a; };
 
   // fajr / isha : angle sous l'horizon, ou isha en minutes après le maghrib.
+  // decalage : minutes ajoutées après le calcul (par défaut 1 min après le zénith pour Dhuhr).
   const METHODS = {
     france15: { nom: "France 15° (courant en France)", fajr: 15, isha: 15 },
+    maroc: { nom: "Maroc (ministère des Habous)", fajr: 19, isha: 17, decalage: { dhuhr: 5, maghrib: 5 } },
     uoif: { nom: "UOIF 12°", fajr: 12, isha: 12 },
     mwl: { nom: "Ligue islamique mondiale 18° / 17°", fajr: 18, isha: 17 },
     france18: { nom: "18° / 18°", fajr: 18, isha: 18 },
@@ -61,8 +63,9 @@
     if (isNaN(t.fajr) || fix(t.sunrise - t.fajr, 24) > fajrMax) t.fajr = t.sunrise - fajrMax;
     if (M.ishaMin) t.isha = t.sunset + M.ishaMin / 60;
     else { const ishaMax = (M.isha / 60) * night; if (isNaN(t.isha) || fix(t.isha - t.sunset, 24) > ishaMax) t.isha = t.sunset + ishaMax; }
-    t.dhuhr += 1 / 60; // marge d'une minute après le zénith
-    t.maghrib = t.sunset;
+    const dec = M.decalage || {};
+    t.dhuhr += (dec.dhuhr != null ? dec.dhuhr : 1) / 60;
+    t.maghrib = t.sunset + (dec.maghrib || 0) / 60;
 
     const base = Date.UTC(y, mo - 1, d);
     const toDate = (h) => new Date(base + Math.round((h - lng / 15) * 60) * 60000);
