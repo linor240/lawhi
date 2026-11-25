@@ -1,0 +1,18 @@
+{
+  "appId": "app.lawhi",
+  "appName": "Lawhi",
+  "webDir": "www",
+  "server": {
+    "url": "https://linor240.github.io/lawhi/",
+    "errorPath": "hors-ligne.html"
+  },
+  "android": {
+    "backgroundColor": "#231e11"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_lawhi",
+      "iconColor": "#DCC89A"
+    }
+  }
+}

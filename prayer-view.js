@@ -50,7 +50,44 @@ function nextPrayer() {
 function hijri(d) {
   try { return new Intl.DateTimeFormat("fr-FR-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(d); } catch { return ""; }
 }
-function setPrayer(patch) { store.set("prayer", Object.assign(pset(), patch)); render(); }
+function setPrayer(patch) { store.set("prayer", Object.assign(pset(), patch)); render(); planNotifs(); }
+
+// ---------- Notifications de prière (appli Android seulement) ----------
+// Dans l'appli, Capacitor fournit LocalNotifications : on programme les 5 prières des 7 prochains jours,
+// et on recommence à chaque ouverture pour que la semaine glisse.
+const LN = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() ? window.Capacitor.Plugins.LocalNotifications : null;
+const NOTIF_BASE = 1000;
+async function planNotifs() {
+  if (!LN) return;
+  try {
+    const pend = await LN.getPending();
+    const mine = (pend.notifications || []).filter((n) => n.id >= NOTIF_BASE && n.id < NOTIF_BASE + 100).map((n) => ({ id: n.id }));
+    if (mine.length) await LN.cancel({ notifications: mine });
+    const p = pset(); if (!p.notif) return;
+    await LN.createChannel({ id: "prieres", name: "Heures de prière", description: "Une notification à l'heure de chaque prière", importance: 4, visibility: 1, vibration: true });
+    const now = new Date(), list = [];
+    for (let off = 0; off < 7; off++) {
+      const t = timesFor(dayDate(off));
+      PRAYERS.forEach(([k, nom, ar], i) => {
+        if (k === "sunrise" || !(t[k] > now)) return;
+        list.push({ id: NOTIF_BASE + off * 10 + i, title: `${nom} · ${ar}`, body: `C'est l'heure de la prière (${hm(t[k])}, ${p.loc.name}).`, channelId: "prieres", smallIcon: "ic_stat_lawhi", schedule: { at: t[k], allowWhileIdle: true } });
+      });
+    }
+    if (list.length) await LN.schedule({ notifications: list });
+  } catch (e) { console.warn("notifications", e); }
+}
+async function toggleNotifs() {
+  const p = pset();
+  if (!p.notif) {
+    const r = await LN.requestPermissions();
+    if (r.display !== "granted") { toast("Notifications refusées. Autorise-les dans les réglages Android de Lawhi."); return; }
+  }
+  setPrayer({ notif: !p.notif });
+  toast(p.notif ? "Notifications de prière coupées." : "Une notification arrivera à l'heure de chaque prière.");
+}
+document.addEventListener("click", (e) => { if (e.target.closest("[data-pnotif]")) toggleNotifs(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) planNotifs(); });
+window.addEventListener("load", planNotifs);
 
 // Horloge à aiguilles, pour lire l'heure sans les chiffres. Un soleil ou une lune dit si c'est le jour ou la nuit.
 function clockSvg(d, size) {
@@ -115,6 +152,7 @@ function viewPrayers() {
       <p class="muted" style="font-size:13px">Les horaires suivent la course du soleil : ils changent chaque jour et avec les saisons.</p>
       <div class="wtable"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>
     <div class="card"><h3>Réglages</h3>
+      ${LN ? `<div class="field"><span class="eyebrow">Notifications</span><button class="chip" data-pnotif aria-pressed="${!!p.notif}">${p.notif ? "Activées à l'heure de chaque prière" : "Me prévenir à l'heure de chaque prière"}</button></div>` : ""}
       <div class="field"><span class="eyebrow">Lieu · ${esc(p.loc.name)}</span>
         <button class="btn ghost" data-act="geo">${I.pin}Utiliser ma position</button>
         <div class="row" style="flex-wrap:nowrap">
