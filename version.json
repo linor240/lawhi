@@ -1,10 +1,7 @@
 {
-  "version": "1.3.0",
+  "version": "1.3.1",
   "date": "2026-11-25",
   "notes": [
-    "Lire : pose un marque-page sur un verset et reprends ta lecture là où tu t'étais arrêté.",
-    "Lire : une barre en bas permet de mettre en pause ou d'arrêter la récitation à tout moment.",
-    "Prières : affichage des heures avec une horloge à aiguilles.",
-    "Prières : ajout du Maroc (méthode officielle du ministère des Habous), de la Belgique et de la Suisse."
+    "Nouveau récitateur : Islam Sobhi. Les quelques sourates absentes chez lui et le mode « + Traduction » utilisent la voix d'Alafasy."
   ]
 }
