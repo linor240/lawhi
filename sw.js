@@ -1,7 +1,7 @@
 // Service worker Lawhi.
 // Chaque version a son propre cache : la nouvelle version se télécharge en arrière-plan,
 // puis attend que l'utilisateur (ou la mise à jour automatique) l'installe.
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 const SHELL = "lawhi-shell-" + VERSION, DATA = "lawhi-data-v1", AUDIO = "lawhi-audio-v1";
 const FILES = ["./", "index.html", "app.js", "surahs.js", "content.js", "prayer.js", "prayer-view.js", "update.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
